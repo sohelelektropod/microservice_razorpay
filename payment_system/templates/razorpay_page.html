@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Payment Page</title>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+<h2>Razorpay Payment Page</h2>
+
+<form id="razorpay-form" method="POST" action="{% url 'process_payment' %}">
+    {% csrf_token %}
+    <label for="amount">Amount:</label>
+    <input type="number" id="amount" name="amount" required>
+
+    <input type="hidden" id="razorpay_payment_id" name="razorpay_payment_id" value="">
+
+    <button id="razorpay-button">Pay with Razorpay</button>
+</form>
+<script>
+    var rzpOptions = {
+        "key": "rzp_test_7GdoiyFlxJuVO4",
+        "amount": "1000",  // Default amount, you can set it as per your needs
+        "currency": "INR",
+        "name": "Elektropod",
+        "description": "Payment for your purchase",
+        "handler": function(response) {
+            console.log('Razorpay Response:', response);
+
+            document.getElementById('razorpay_payment_id').value = response.razorpay_payment_id;
+            document.getElementById('razorpay-form').submit();
+        }
+    };
+
+    var rzp = new Razorpay(rzpOptions);
+
+    document.getElementById('razorpay-button').onclick = function(e){
+        // Get the entered amount from the form
+        var enteredAmount = document.getElementById('amount').value;
+
+        // Update the amount in the Razorpay options
+        rzpOptions.amount = enteredAmount * 100;  // Razorpay expects amount in paisa
+
+        // Reinitialize Razorpay with updated options
+        rzp = new Razorpay(rzpOptions);
+
+        // Open Razorpay checkout
+        rzp.open();
+        e.preventDefault();
+    };
+</script>
+
+</body>
+</html>
