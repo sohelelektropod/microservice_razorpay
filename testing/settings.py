@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-ekao54-w*u$v#zb6cf6*_!17symow%d(_6h66)ee%guc!mlch-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['4d31-117-229-174-115.ngrok-free.app', 'localhost']
 
 # Application definition
 
@@ -127,14 +127,13 @@ RAZOR_API = 'https://api.razorpay.com/v1/payments/{}/?expand[]=card'
 RAZOR_KEY_ID = "rzp_test_7GdoiyFlxJuVO4"
 RAZOR_KEY_SECRET = "TksSZT7DG7VOE7tdoY2wINOl"
 
-
-STRIPE_CONFIG = {
-    'API_URL': 'https://api.stripe.com/v1/charges/{}',
-    'SECRET_KEY': "sk_test_51ORAd9SITCGHlkCaJ8tHRJNqegaeOUxtnPzJNCEYAwuwkTPFrR27eYdvLp4pcx8z5Cm2y7xI54NrRNeSMWaFiuBy00FICFZg59",
-}
+API_URL = 'https://api.stripe.com/v1/charges/{}'
+STRIPE_SECRET_KEY = "sk_test_51ORAd9SITCGHlkCaJ8tHRJNqegaeOUxtnPzJNCEYAwuwkTPFrR27eYdvLp4pcx8z5Cm2y7xI54NrRNeSMWaFiuBy00FICFZg59"
+PUBLIC_KEY = "pk_test_51ORAd9SITCGHlkCapbyqZWqDF0FokZ44oXF9hSBCKbpF157nJmQjzP7J8ujeVHgRPjRKBTvsSmAokNEopYCjRvJY00pCPZPcZ4"
 
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
 }
+

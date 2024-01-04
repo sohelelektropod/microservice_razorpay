@@ -1,15 +1,21 @@
 import json
 import razorpay
-from django.shortcuts import render
+from django.conf import settings
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .serializers import TransactionSerializer
 from .utils import process_razorpay_payment
 
+import stripe
+from .utils import process_stripe_payment
 
-class ProcessPaymentView(APIView):
+
+class ProcessRazorpayView(APIView):
 
     def post(self, request):
         try:
@@ -147,5 +153,138 @@ def show_razorpay_page(request):
     return render(request, 'razorpay_page.html')
 
 
-def show_stripe_page(request):
-    return render(request, 'stripe_page.html')
+# -------------------------------------- Checkout stripe------------------------------------------------------
+
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+
+def product_page(request):
+    return render(request, 'stripe_checkout.html')
+
+
+@require_POST
+@csrf_exempt
+def create_stripe_checkout_session(request):
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    data = json.loads(request.body.decode('utf-8'))
+
+    amount_in_rupees = float(data.get('amount'))
+    amount_in_paise = int(amount_in_rupees * 100)
+
+    currency = 'INR'
+
+    description = data.get('description')
+    shipping = data.get('shipping', {})
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=['card'],
+        line_items=[{
+            'price_data': {
+                'currency': currency,
+                'product_data': {
+                    'name': 'Elektropod',
+                    'description': description,
+                },
+                'unit_amount': int(amount_in_paise),
+            },
+            'quantity': 1,
+        }],
+        mode='payment',
+        success_url=request.build_absolute_uri('/api/success/'),
+        cancel_url=request.build_absolute_uri('/api/cancel/'),
+        shipping_address_collection={
+            'allowed_countries': ['US', 'CA'],
+        },
+        shipping=shipping,
+    )
+
+    # session = stripe.checkout.Session.create(
+    #     payment_method_types=['card'],
+    #     line_items=[{
+    #         'price_data': {
+    #             'currency': currency,
+    #             'product_data': {
+    #                 'name': 'Elektropod',
+    #                 'description': description,
+    #             },
+    #             'unit_amount': int(amount_in_paise),
+    #         },
+    #         'quantity': 1,
+    #     }],
+    #     mode='payment',
+    #     success_url=request.build_absolute_uri('/api/success/'),
+    #     cancel_url=request.build_absolute_uri('/api/cancel/'),
+    #     shipping_address_collection={},  # Set it as an empty dictionary
+    #     shipping=shipping,
+    # )
+
+    return JsonResponse({'id': session.id})
+
+
+def success_page(request):
+    return render(request, 'success.html')
+
+
+def cancel_page(request):
+    return render(request, 'cancel.html')
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    payload = request.body
+    sig_header = request.headers['Stripe-Signature']
+    endpoint_secret = 'whsec_uNjtt0OW3II2ZMHJrMFFDpmj9cwKCqRr'
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+        print("event-----------", event)
+    except ValueError as e:
+        return HttpResponse(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        return HttpResponse(status=400)
+
+    print("before type-----------")
+    if event['type'] == 'payment_intent.succeeded':
+        payment_intent = event['data']['object']
+        payment_intent_id = payment_intent.get('id', None)
+        print("after type--------------")
+
+        if payment_intent_id:
+            print("Transaction saved successfully")
+            save_transaction(payment_intent)
+            if payment_intent['status'] != 'succeeded':
+                capture_payment(payment_intent_id)
+
+    return HttpResponse(status=200)
+
+
+def capture_payment(payment_intent_id):
+    try:
+        captured_payment_intent = stripe.PaymentIntent.capture(payment_intent_id)
+        print(f"PaymentIntent {captured_payment_intent['id']} was captured.")
+    except stripe.error.StripeError as e:
+        print(f"Error capturing payment: {e}")
+
+
+def save_transaction(payment_intent):
+    try:
+        amount = payment_intent.get('amount') / 100
+        transaction_data = {
+            'amount': amount,
+            'payment_id': payment_intent['id'],
+            'payment_method': 'stripe',
+            'transaction_info1': None,
+            'transaction_info2': None,
+        }
+
+        serializer = TransactionSerializer(data=transaction_data)
+        if serializer.is_valid():
+            serializer.save(status='completed')
+        else:
+            print("Invalid data for transaction")
+    except Exception as e:
+        print(f"Error saving transaction: {e}")
